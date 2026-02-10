@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "printer-keystone"
+version = "0.1.0"
+description = "Generate a duplex calibration PDF and compute front/back print alignment offsets from scans."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.24",
+  "opencv-contrib-python>=4.8",
+  "Pillow>=10",
+  "PyMuPDF>=1.23",
+  "reportlab>=4.0",
+  "typer>=0.12",
+]
+
+[project.scripts]
+printer-keystone = "printer_keystone.cli:app"
+
+[tool.setuptools]
+packages = ["printer_keystone"]
