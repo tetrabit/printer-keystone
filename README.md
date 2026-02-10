@@ -47,3 +47,24 @@ The command prints:
   - Scan with auto-crop off if possible.
   - Use a flatbed or a consistent ADF; avoid skew.
   - Ensure the full page edges are visible in the scan.
+
+## Printable Margins (Important)
+
+Many printers cannot print close to the paper edge, which can cause the border/fiducials to be clipped.
+
+If the border does not print, regenerate with a larger inset:
+
+```bash
+printer-keystone generate --paper letter --safe-inset-mm 15 --out calibration.pdf
+```
+
+The analyzer primarily uses the paper edges; if your scanner crops the page or the tool reports a crazy `scale`
+(far from 1.0), re-scan with the full page edges visible or enable debug output:
+
+```bash
+printer-keystone analyze ... --debug-dir debug_out
+```
+
+Check:
+- `debug_out/*_paper_corners.png`: red dots must land on the actual page corners (not on a marker/border).
+- `debug_out/*_markers.png`: should show detected IDs `10,11,12,13,14`.

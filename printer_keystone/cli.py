@@ -17,8 +17,27 @@ app = typer.Typer(add_completion=False)
 def generate(
     out: Path = typer.Option(Path("calibration.pdf"), "--out", help="Output PDF path."),
     paper: str = typer.Option("letter", "--paper", help=f"Paper size. One of: {', '.join(sorted(PAPERS))}"),
+    safe_inset_mm: float = typer.Option(12.0, "--safe-inset-mm", help="Inset from paper edge for the printed border (mm)."),
+    marker_size_mm: float = typer.Option(22.0, "--marker-size-mm", help="ArUco marker size (mm)."),
+    marker_margin_mm: float = typer.Option(
+        15.0,
+        "--marker-margin-mm",
+        help="Distance from paper edge to marker outer edge (mm). Should be >= safe inset + ~3mm.",
+    ),
+    border_inset_mm: Optional[float] = typer.Option(
+        None,
+        "--border-inset-mm",
+        help="Inset from paper edge for the printed border (mm). Defaults to --safe-inset-mm.",
+    ),
 ) -> None:
-    pdf = generate_calibration_pdf(out, paper=paper)
+    pdf = generate_calibration_pdf(
+        out,
+        paper=paper,
+        safe_inset_mm=safe_inset_mm,
+        marker_size_mm=marker_size_mm,
+        marker_margin_mm=marker_margin_mm,
+        border_inset_mm=border_inset_mm,
+    )
     typer.echo(str(pdf))
 
 
@@ -30,13 +49,22 @@ def analyze(
     back_page: int = typer.Option(1, "--back-page", help="If --back is a PDF, 1-based page number to use."),
     dpi: int = typer.Option(300, "--dpi", help="DPI when rasterizing PDFs for analysis."),
     paper: str = typer.Option("letter", "--paper", help=f"Paper size. One of: {', '.join(sorted(PAPERS))}"),
+    marker_size_mm: float = typer.Option(22.0, "--marker-size-mm", help="Marker size (mm) used when generating the calibration PDF."),
+    marker_margin_mm: float = typer.Option(15.0, "--marker-margin-mm", help="Marker margin (mm) used when generating the calibration PDF."),
     debug_dir: Optional[Path] = typer.Option(None, "--debug-dir", help="If set, writes debug images here."),
 ) -> None:
     dbg = ensure_dir(debug_dir)
     front_img = load_image_or_pdf(front, page=front_page, dpi=dpi)
     back_img = load_image_or_pdf(back, page=back_page, dpi=dpi)
 
-    res = analyze_duplex(front_bgr=front_img.bgr, back_bgr=back_img.bgr, paper=paper, debug_dir=dbg)
+    res = analyze_duplex(
+        front_bgr=front_img.bgr,
+        back_bgr=back_img.bgr,
+        paper=paper,
+        marker_size_mm=marker_size_mm,
+        marker_margin_mm=marker_margin_mm,
+        debug_dir=dbg,
+    )
 
     dx, dy = res.back_shift_mm
     def lr(val: float) -> str:

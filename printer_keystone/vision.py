@@ -34,6 +34,9 @@ def detect_paper_quad_corners(bgr: np.ndarray) -> np.ndarray:
     """
     import cv2
 
+    h, w = bgr.shape[:2]
+    img_area = float(h * w)
+
     gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
     gray = cv2.GaussianBlur(gray, (5, 5), 0)
     edges = cv2.Canny(gray, 40, 140)
@@ -41,12 +44,26 @@ def detect_paper_quad_corners(bgr: np.ndarray) -> np.ndarray:
 
     contours, _hier = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
-        raise ValueError("Could not find any contours for paper detection")
+        # Common when the scan background is uniformly white and the paper edge isn't visible.
+        return np.array([[0.0, 0.0], [float(w - 1), 0.0], [float(w - 1), float(h - 1)], [0.0, float(h - 1)]], dtype=np.float32)
 
     contour = max(contours, key=cv2.contourArea)
     area = float(cv2.contourArea(contour))
-    if area < 10_000:
-        raise ValueError("Largest contour is too small; paper detection failed")
+    # If the largest contour is too small relative to the whole image, it's likely a fiducial or other
+    # printed object. In that case, treat the image bounds as the paper bounds (many scanners/PDFs
+    # are already cropped to the page).
+    if area < 10_000 or (area / img_area) < 0.25:
+        return np.array([[0.0, 0.0], [float(w - 1), 0.0], [float(w - 1), float(h - 1)], [0.0, float(h - 1)]], dtype=np.float32)
+
+    # If the largest contour is a large inset rectangle (common when a printed border is the strongest edge),
+    # prefer image bounds as the paper bounds.
+    x, y, bw, bh = cv2.boundingRect(contour)
+    inset_l = float(x) / float(w)
+    inset_t = float(y) / float(h)
+    inset_r = float(w - (x + bw)) / float(w)
+    inset_b = float(h - (y + bh)) / float(h)
+    if (area / img_area) > 0.75 and min(inset_l, inset_t, inset_r, inset_b) > 0.04:
+        return np.array([[0.0, 0.0], [float(w - 1), 0.0], [float(w - 1), float(h - 1)], [0.0, float(h - 1)]], dtype=np.float32)
 
     peri = cv2.arcLength(contour, True)
     approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
@@ -152,4 +169,3 @@ def map_points_px_to_mm(H_px_to_mm: np.ndarray, pts_px: np.ndarray) -> np.ndarra
     pts = pts_px.reshape(-1, 1, 2).astype(np.float32)
     out = cv2.perspectiveTransform(pts, H_px_to_mm.astype(np.float64))
     return out.reshape(-1, 2).astype(np.float64)
-

@@ -110,13 +110,15 @@ def analyze_side(
     bgr: np.ndarray,
     *,
     paper: str,
+    marker_size_mm: float = 22.0,
+    marker_margin_mm: float = 15.0,
     debug_dir: Optional[Path] = None,
     debug_tag: str = "front",
 ) -> SideResult:
     import cv2
 
     ps = get_paper(paper)
-    layout = default_layout(ps.width_mm, ps.height_mm)
+    layout = default_layout(ps.width_mm, ps.height_mm, marker_size_mm=float(marker_size_mm), margin_mm=float(marker_margin_mm))
 
     det = paper_homography_px_to_mm(bgr, width_mm=ps.width_mm, height_mm=ps.height_mm, debug_dir=debug_dir, debug_tag=debug_tag)
 
@@ -181,10 +183,26 @@ def analyze_duplex(
     front_bgr: np.ndarray,
     back_bgr: np.ndarray,
     paper: str,
+    marker_size_mm: float = 22.0,
+    marker_margin_mm: float = 15.0,
     debug_dir: Optional[Path] = None,
 ) -> DuplexResult:
-    front = analyze_side(front_bgr, paper=paper, debug_dir=debug_dir, debug_tag="front")
-    back = analyze_side(back_bgr, paper=paper, debug_dir=debug_dir, debug_tag="back")
+    front = analyze_side(
+        front_bgr,
+        paper=paper,
+        marker_size_mm=marker_size_mm,
+        marker_margin_mm=marker_margin_mm,
+        debug_dir=debug_dir,
+        debug_tag="front",
+    )
+    back = analyze_side(
+        back_bgr,
+        paper=paper,
+        marker_size_mm=marker_size_mm,
+        marker_margin_mm=marker_margin_mm,
+        debug_dir=debug_dir,
+        debug_tag="back",
+    )
 
     dx = front.translation_mm[0] - back.translation_mm[0]
     dy = front.translation_mm[1] - back.translation_mm[1]
