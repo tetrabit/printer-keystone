@@ -62,18 +62,30 @@ def detect_paper_quad_corners(bgr: np.ndarray) -> tuple[np.ndarray, str]:
             "image_bounds",
         )
 
-    # If the largest contour is a large inset rectangle (common when a printed border is the strongest edge),
-    # prefer image bounds as the paper bounds.
+    # If the largest contour is a large inset rectangle, it may be the printed border (not the paper edge).
+    # Only prefer image bounds when the scan appears to already be cropped to the page (no dark background
+    # visible outside the paper).
     x, y, bw, bh = cv2.boundingRect(contour)
     inset_l = float(x) / float(w)
     inset_t = float(y) / float(h)
     inset_r = float(w - (x + bw)) / float(w)
     inset_b = float(h - (y + bh)) / float(h)
-    if (area / img_area) > 0.75 and min(inset_l, inset_t, inset_r, inset_b) > 0.04:
-        return (
-            np.array([[0.0, 0.0], [float(w - 1), 0.0], [float(w - 1), float(h - 1)], [0.0, float(h - 1)]], dtype=np.float32),
-            "image_bounds",
+    if (area / img_area) > 0.75 and min(inset_l, inset_t, inset_r, inset_b) > 0.03:
+        # Sample the outer strip; if it's nearly white, the scan is likely already cropped to the page.
+        strip = max(4, int(round(0.02 * min(h, w))))
+        border_pixels = np.concatenate(
+            [
+                gray[:strip, :].reshape(-1),
+                gray[-strip:, :].reshape(-1),
+                gray[:, :strip].reshape(-1),
+                gray[:, -strip:].reshape(-1),
+            ]
         )
+        if float(np.mean(border_pixels)) > 245.0:
+            return (
+                np.array([[0.0, 0.0], [float(w - 1), 0.0], [float(w - 1), float(h - 1)], [0.0, float(h - 1)]], dtype=np.float32),
+                "image_bounds",
+            )
 
     peri = cv2.arcLength(contour, True)
     approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
@@ -262,15 +274,18 @@ def paper_homography_px_to_mm(
     markers = detect_aruco_markers(bgr)
     centers = marker_centers(markers)
 
-    corners_unordered, method = detect_paper_quad_corners(bgr)
-
-    # If scan is likely cropped to the inset border and we know the inset, use the printed border as reference.
     border_inset_mm_f = None if border_inset_mm is None else float(border_inset_mm)
-    if border_inset_mm_f is not None and method == "image_bounds":
+    if border_inset_mm_f is not None:
+        # Prefer the printed border quad when available: it is present even when the scan is cropped
+        # and the physical paper edge is invisible. If border detection fails, fall back to paper edges.
         border = detect_border_quad_corners(bgr, debug_dir=debug_dir, debug_tag=debug_tag)
         if border is not None:
             corners_unordered = border.astype(np.float32)
             method = "border"
+        else:
+            corners_unordered, method = detect_paper_quad_corners(bgr)
+    else:
+        corners_unordered, method = detect_paper_quad_corners(bgr)
 
     # Use marker IDs to label corners if possible; otherwise geometric ordering.
     h, w = bgr.shape[:2]
