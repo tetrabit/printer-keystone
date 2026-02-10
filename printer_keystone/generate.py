@@ -17,7 +17,15 @@ def _draw_crosshair(c: canvas.Canvas, x_pt: float, y_pt: float, r_pt: float = 10
     c.restoreState()
 
 
-def generate_calibration_pdf(out_path: str | Path, *, paper: str = "letter") -> Path:
+def generate_calibration_pdf(
+    out_path: str | Path,
+    *,
+    paper: str = "letter",
+    safe_inset_mm: float = 12.0,
+    marker_size_mm: float = 22.0,
+    marker_margin_mm: float | None = None,
+    border_inset_mm: float | None = None,
+) -> Path:
     """
     Generates a 2-page PDF:
       page 1: front
@@ -35,19 +43,22 @@ def generate_calibration_pdf(out_path: str | Path, *, paper: str = "letter") -> 
 
     c = canvas.Canvas(str(out), pagesize=(width_pt, height_pt))
 
-    layout = default_layout(p.width_mm, p.height_mm)
+    # safe_inset_mm: distance from paper edge to the printed border.
+    # marker_margin_mm: distance from paper edge to marker outer edge; keep it >= border inset + clearance.
+    border_inset_mm = safe_inset_mm if border_inset_mm is None else float(border_inset_mm)
+    clearance_mm = 3.0
+    marker_margin_mm = (
+        max(float(marker_margin_mm), border_inset_mm + clearance_mm) if marker_margin_mm is not None else (border_inset_mm + clearance_mm)
+    )
+
+    layout = default_layout(p.width_mm, p.height_mm, marker_size_mm=float(marker_size_mm), margin_mm=float(marker_margin_mm))
 
     def draw_side(side: str) -> None:
         c.setTitle("printer-keystone calibration")
-        c.setFont("Helvetica", 10)
-        c.drawString(mm_to_points(12), height_pt - mm_to_points(10), f"{side.upper()} - paper={p.name}")
-        c.setFont("Helvetica", 8)
-        c.drawString(mm_to_points(12), height_pt - mm_to_points(16), "Print at 100% scale (no fit-to-page). Then scan with full paper edges visible.")
-
         # Add a light border to help paper-edge detection.
         c.saveState()
         c.setLineWidth(0.5)
-        inset = mm_to_points(2.0)
+        inset = mm_to_points(border_inset_mm)
         c.rect(inset, inset, width_pt - 2 * inset, height_pt - 2 * inset)
         c.restoreState()
 
@@ -69,6 +80,19 @@ def generate_calibration_pdf(out_path: str | Path, *, paper: str = "letter") -> 
             # small label
             c.setFont("Helvetica", 7)
             c.drawString(x_pt, y_pt - mm_to_points(2.8), f"id={mid}")
+
+        # Header/instructions: keep them inside the safe area and to the right of the top-left marker.
+        text_x_mm = marker_margin_mm + layout.marker_size_mm + 6.0
+        title_y_mm = border_inset_mm + 6.0
+        instr_y_mm = title_y_mm + 6.0
+        c.setFont("Helvetica", 10)
+        c.drawString(mm_to_points(text_x_mm), height_pt - mm_to_points(title_y_mm), f"{side.upper()} - paper={p.name}")
+        c.setFont("Helvetica", 8)
+        c.drawString(
+            mm_to_points(text_x_mm),
+            height_pt - mm_to_points(instr_y_mm),
+            "Print at 100% scale (no fit-to-page). Then scan with full paper edges visible.",
+        )
 
     # Front
     draw_side("front")

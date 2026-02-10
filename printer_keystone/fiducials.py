@@ -14,9 +14,12 @@ class FiducialLayout:
     margin_mm: float
 
 
-def default_layout(width_mm: float, height_mm: float, *, marker_size_mm: float = 22.0, margin_mm: float = 12.0) -> FiducialLayout:
+def default_layout(width_mm: float, height_mm: float, *, marker_size_mm: float = 22.0, margin_mm: float = 15.0) -> FiducialLayout:
     # Paper coordinates: origin at top-left, +x right, +y down.
     # IDs chosen to be stable and easy to distinguish.
+    #
+    # Note: margin_mm is the distance from the paper edge to the marker's OUTER edge.
+    # The marker center is at (margin_mm + marker_size_mm/2).
     centers = {
         10: (margin_mm + marker_size_mm / 2.0, margin_mm + marker_size_mm / 2.0),  # TL
         11: (width_mm - margin_mm - marker_size_mm / 2.0, margin_mm + marker_size_mm / 2.0),  # TR
@@ -72,4 +75,3 @@ def marker_centers(corners_by_id: dict[int, np.ndarray]) -> dict[int, tuple[floa
         cy = float(corners[:, 1].mean())
         centers[mid] = (cx, cy)
     return centers
-
