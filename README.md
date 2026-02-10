@@ -7,6 +7,15 @@ CLI tool to:
 
 ## Install
 
+Because some systems enforce PEP 668 ("externally managed environment"), you may need a virtualenv:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m ensurepip --upgrade
+.venv/bin/python -m pip install -U pip
+.venv/bin/python -m pip install -e .
+```
+
 ```bash
 python3 -m pip install -e .
 ```
@@ -17,6 +26,12 @@ python3 -m pip install -e .
 
 ```bash
 printer-keystone generate --paper letter --out calibration.pdf
+```
+
+If your printer can’t print close to the edges, increase the safe inset:
+
+```bash
+printer-keystone generate --paper letter --safe-inset-mm 15 --out calibration.pdf
 ```
 
 2. Print it duplex (100% scale; no "fit to page").
@@ -42,7 +57,7 @@ The command prints:
 
 ## Notes / Assumptions
 
-- This computes alignment relative to detected paper edges (not relative to the printed fiducials themselves).
+- This computes alignment relative to detected page bounds. If the scan does not include physical paper edges, the analyzer may treat the scan image bounds as the page.
 - For best results:
   - Scan with auto-crop off if possible.
   - Use a flatbed or a consistent ADF; avoid skew.
@@ -58,8 +73,9 @@ If the border does not print, regenerate with a larger inset:
 printer-keystone generate --paper letter --safe-inset-mm 15 --out calibration.pdf
 ```
 
-The analyzer primarily uses the paper edges; if your scanner crops the page or the tool reports a crazy `scale`
-(far from 1.0), re-scan with the full page edges visible or enable debug output:
+## Debug Output And Diagnostics
+
+If the tool reports a crazy `scale` (far from 1.0) or large `rot_deg`, enable debug output:
 
 ```bash
 printer-keystone analyze ... --debug-dir debug_out
@@ -68,3 +84,10 @@ printer-keystone analyze ... --debug-dir debug_out
 Check:
 - `debug_out/*_paper_corners.png`: red dots must land on the actual page corners (not on a marker/border).
 - `debug_out/*_markers.png`: should show detected IDs `10,11,12,13,14`.
+
+What “good” typically looks like:
+- `scale` is close to `1.0`
+- `rot_deg` is close to `0`
+- `markers` includes all five IDs `[10, 11, 12, 13, 14]` on both sides
+
+If you see `scale` around `10+` or `rot_deg` around `5+`, the analyzer probably used the wrong contour as the “page” (often a marker or the inset border). Re-scan with full page edges visible and good contrast around the paper, or increase `--safe-inset-mm` so the border prints.
