@@ -83,6 +83,7 @@ printer-keystone analyze ... --debug-dir debug_out
 
 Check:
 - `debug_out/*_paper_corners.png`: red dots must land on the actual page corners (not on a marker/border).
+- `debug_out/*_border_corners.png`: if present, shows detected inset border corners used as a fallback reference.
 - `debug_out/*_markers.png`: should show detected IDs `10,11,12,13,14`.
 
 What “good” typically looks like:

@@ -112,6 +112,7 @@ def analyze_side(
     paper: str,
     marker_size_mm: float = 22.0,
     marker_margin_mm: float = 15.0,
+    border_inset_mm: Optional[float] = None,
     debug_dir: Optional[Path] = None,
     debug_tag: str = "front",
 ) -> SideResult:
@@ -120,7 +121,14 @@ def analyze_side(
     ps = get_paper(paper)
     layout = default_layout(ps.width_mm, ps.height_mm, marker_size_mm=float(marker_size_mm), margin_mm=float(marker_margin_mm))
 
-    det = paper_homography_px_to_mm(bgr, width_mm=ps.width_mm, height_mm=ps.height_mm, debug_dir=debug_dir, debug_tag=debug_tag)
+    det = paper_homography_px_to_mm(
+        bgr,
+        width_mm=ps.width_mm,
+        height_mm=ps.height_mm,
+        border_inset_mm=border_inset_mm,
+        debug_dir=debug_dir,
+        debug_tag=debug_tag,
+    )
 
     markers = detect_aruco_markers(bgr)
     centers_px = marker_centers(markers)
@@ -185,6 +193,7 @@ def analyze_duplex(
     paper: str,
     marker_size_mm: float = 22.0,
     marker_margin_mm: float = 15.0,
+    border_inset_mm: Optional[float] = None,
     debug_dir: Optional[Path] = None,
 ) -> DuplexResult:
     front = analyze_side(
@@ -192,6 +201,7 @@ def analyze_duplex(
         paper=paper,
         marker_size_mm=marker_size_mm,
         marker_margin_mm=marker_margin_mm,
+        border_inset_mm=border_inset_mm,
         debug_dir=debug_dir,
         debug_tag="front",
     )
@@ -200,6 +210,7 @@ def analyze_duplex(
         paper=paper,
         marker_size_mm=marker_size_mm,
         marker_margin_mm=marker_margin_mm,
+        border_inset_mm=border_inset_mm,
         debug_dir=debug_dir,
         debug_tag="back",
     )

@@ -51,6 +51,11 @@ def analyze(
     paper: str = typer.Option("letter", "--paper", help=f"Paper size. One of: {', '.join(sorted(PAPERS))}"),
     marker_size_mm: float = typer.Option(22.0, "--marker-size-mm", help="Marker size (mm) used when generating the calibration PDF."),
     marker_margin_mm: float = typer.Option(15.0, "--marker-margin-mm", help="Marker margin (mm) used when generating the calibration PDF."),
+    border_inset_mm: Optional[float] = typer.Option(
+        None,
+        "--border-inset-mm",
+        help="Border inset (mm) used when generating the calibration PDF. Helps if scans are cropped to the border.",
+    ),
     debug_dir: Optional[Path] = typer.Option(None, "--debug-dir", help="If set, writes debug images here."),
 ) -> None:
     dbg = ensure_dir(debug_dir)
@@ -63,6 +68,7 @@ def analyze(
         paper=paper,
         marker_size_mm=marker_size_mm,
         marker_margin_mm=marker_margin_mm,
+        border_inset_mm=border_inset_mm,
         debug_dir=dbg,
     )
 
