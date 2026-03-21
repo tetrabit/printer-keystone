@@ -239,9 +239,12 @@ def analyze_duplex(
         border_inset_mm=border_inset_mm,
         debug_dir=debug_dir,
         debug_tag="back",
-        mirror_ideal_x=True,
     )
 
-    dx = front.translation_mm[0] - back.translation_mm[0]
+    # For long-edge duplex: the back page is flipped horizontally, so the
+    # X translations of front and back both push content in the SAME visual
+    # direction. The total misalignment the user sees is front_tx + back_tx.
+    # Y axis is unaffected by the long-edge flip, so we still subtract.
+    dx = front.translation_mm[0] + back.translation_mm[0]
     dy = front.translation_mm[1] - back.translation_mm[1]
     return DuplexResult(front=front, back=back, back_shift_mm=(dx, dy))
