@@ -21,7 +21,9 @@ class SideResult:
     coord_fix: str
 
 
-def _estimate_similarity(ideal_mm: np.ndarray, measured_mm: np.ndarray) -> tuple[np.ndarray, list[int]]:
+def _estimate_similarity(
+    ideal_mm: np.ndarray, measured_mm: np.ndarray
+) -> tuple[np.ndarray, list[int]]:
     import cv2
 
     if ideal_mm.shape[0] < 3:
@@ -115,11 +117,25 @@ def analyze_side(
     border_inset_mm: Optional[float] = None,
     debug_dir: Optional[Path] = None,
     debug_tag: str = "front",
+    mirror_ideal_x: bool = False,
 ) -> SideResult:
     import cv2
 
     ps = get_paper(paper)
-    layout = default_layout(ps.width_mm, ps.height_mm, marker_size_mm=float(marker_size_mm), margin_mm=float(marker_margin_mm))
+    layout = default_layout(
+        ps.width_mm,
+        ps.height_mm,
+        marker_size_mm=float(marker_size_mm),
+        margin_mm=float(marker_margin_mm),
+    )
+    ideal_by_id = (
+        {
+            mid: (ps.width_mm - x_mm, y_mm)
+            for mid, (x_mm, y_mm) in layout.centers_mm.items()
+        }
+        if mirror_ideal_x
+        else layout.centers_mm
+    )
 
     det = paper_homography_px_to_mm(
         bgr,
@@ -137,19 +153,21 @@ def analyze_side(
     want_ids = [10, 11, 12, 13, 14]
     have_ids = [mid for mid in want_ids if mid in centers_px]
     if len(have_ids) < 3:
-        raise ValueError(f"{debug_tag}: found only {len(have_ids)} fiducials; need >=3. Found IDs: {sorted(centers_px)}")
+        raise ValueError(
+            f"{debug_tag}: found only {len(have_ids)} fiducials; need >=3. Found IDs: {sorted(centers_px)}"
+        )
 
     pts_px = np.array([centers_px[mid] for mid in have_ids], dtype=np.float64)
     pts_mm = map_points_px_to_mm(det.homography_px_to_mm, pts_px)
 
-    ideal_mm = np.array([layout.centers_mm[mid] for mid in have_ids], dtype=np.float64)
+    ideal_mm = np.array([ideal_by_id[mid] for mid in have_ids], dtype=np.float64)
 
     pts_mm_fixed, coord_fix = _best_coord_symmetry(
         pts_mm,
         have_ids,
         width_mm=ps.width_mm,
         height_mm=ps.height_mm,
-        ideal_by_id=layout.centers_mm,
+        ideal_by_id=ideal_by_id,
     )
 
     M, inlier_idx = _estimate_similarity(ideal_mm, pts_mm_fixed)
@@ -165,7 +183,15 @@ def analyze_side(
         # draw marker centers + ID
         for mid, (cx, cy) in centers_px.items():
             cv2.circle(dbg, (int(cx), int(cy)), 10, (0, 255, 0), 2)
-            cv2.putText(dbg, str(mid), (int(cx) + 12, int(cy) + 12), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+            cv2.putText(
+                dbg,
+                str(mid),
+                (int(cx) + 12, int(cy) + 12),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (0, 255, 0),
+                2,
+            )
         cv2.imwrite(str(debug_dir / f"{debug_tag}_markers.png"), dbg)
 
     used_ids = [have_ids[i] for i in inlier_idx] if inlier_idx else have_ids
@@ -213,6 +239,7 @@ def analyze_duplex(
         border_inset_mm=border_inset_mm,
         debug_dir=debug_dir,
         debug_tag="back",
+        mirror_ideal_x=True,
     )
 
     dx = front.translation_mm[0] - back.translation_mm[0]
