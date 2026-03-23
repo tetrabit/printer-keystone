@@ -88,8 +88,8 @@ def analyze(
     typer.echo(f"  back_shift_y_mm: {dy:.2f}  ({ud(dy)})")
     typer.echo("")
     typer.echo("Diagnostics:")
-    typer.echo(f"  front: translation_mm=({res.front.translation_mm[0]:.2f}, {res.front.translation_mm[1]:.2f}) rot_deg={res.front.rotation_deg:.3f} scale={res.front.scale:.6f} coord_fix={res.front.coord_fix} markers={res.front.used_marker_ids}")
-    typer.echo(f"  back:  translation_mm=({res.back.translation_mm[0]:.2f}, {res.back.translation_mm[1]:.2f}) rot_deg={res.back.rotation_deg:.3f} scale={res.back.scale:.6f} coord_fix={res.back.coord_fix} markers={res.back.used_marker_ids}")
+    typer.echo(f"  front: translation_mm=({res.front.translation_mm[0]:.2f}, {res.front.translation_mm[1]:.2f}) rot_deg={res.front.rotation_deg:.3f} scale={res.front.scale:.6f} coord_fix={res.front.coord_fix} markers={res.front.used_marker_ids} reproj_err={res.front.reproj_error_mm:.3f}mm")
+    typer.echo(f"  back:  translation_mm=({res.back.translation_mm[0]:.2f}, {res.back.translation_mm[1]:.2f}) rot_deg={res.back.rotation_deg:.3f} scale={res.back.scale:.6f} coord_fix={res.back.coord_fix} markers={res.back.used_marker_ids} reproj_err={res.back.reproj_error_mm:.3f}mm")
 
 
 def main() -> None:

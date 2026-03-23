@@ -58,6 +58,10 @@ def detect_aruco_markers(bgr: np.ndarray) -> dict[int, np.ndarray]:
     aruco = cv2.aruco
     d = aruco.getPredefinedDictionary(getattr(aruco, aruco_dictionary_name()))
     params = aruco.DetectorParameters()
+    params.cornerRefinementMethod = aruco.CORNER_REFINE_SUBPIX
+    params.cornerRefinementWinSize = 5
+    params.cornerRefinementMaxIterations = 50
+    params.cornerRefinementMinAccuracy = 0.01
     detector = aruco.ArucoDetector(d, params)
     corners, ids, _rejected = detector.detectMarkers(gray)
     out: dict[int, np.ndarray] = {}

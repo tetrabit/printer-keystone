@@ -19,6 +19,7 @@ class SideResult:
     scale: float
     used_marker_ids: list[int]
     coord_fix: str
+    reproj_error_mm: float  # RMS reprojection error across inlier markers
 
 
 def _estimate_similarity(
@@ -34,7 +35,7 @@ def _estimate_similarity(
         ideal_mm.astype(np.float32),
         measured_mm.astype(np.float32),
         method=cv2.RANSAC,
-        ransacReprojThreshold=2.0,  # mm
+        ransacReprojThreshold=5.0,  # mm — generous to keep markers as inliers despite paper warp/uneven feed
         maxIters=5000,
         confidence=0.999,
     )
@@ -178,6 +179,12 @@ def analyze_side(
     rot_rad = float(np.arctan2(c, a))
     rot_deg = rot_rad * 180.0 / np.pi
 
+    # Reprojection error: how well does M map ideal -> measured for inliers?
+    used_idx = inlier_idx if inlier_idx else list(range(ideal_mm.shape[0]))
+    projected = (ideal_mm[used_idx] @ M[:2, :2].T) + M[:2, 2]
+    residuals = pts_mm_fixed[used_idx] - projected
+    reproj_rms = float(np.sqrt(np.mean(np.sum(residuals ** 2, axis=1))))
+
     if debug_dir is not None:
         dbg = bgr.copy()
         # draw marker centers + ID
@@ -202,6 +209,7 @@ def analyze_side(
         scale=scale,
         used_marker_ids=used_ids,
         coord_fix=coord_fix,
+        reproj_error_mm=reproj_rms,
     )
 
 
