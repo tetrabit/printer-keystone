@@ -1,94 +1,112 @@
 # printer-keystone
 
-CLI tool to:
-
-1. Generate a duplex calibration PDF (front + back) with fiducial marks.
-2. Analyze scans of the printed front/back to compute the back-vs-front alignment offset in millimeters.
+CLI tool for duplex printer alignment calibration. Measures and corrects the front-to-back offset your printer introduces during duplex printing.
 
 ## Install
 
-Because some systems enforce PEP 668 ("externally managed environment"), you may need a virtualenv:
-
 ```bash
+# Using uv (recommended)
+uv sync
+
+# Or with pip
 python3 -m venv .venv
-.venv/bin/python -m ensurepip --upgrade
-.venv/bin/python -m pip install -U pip
-.venv/bin/python -m pip install -e .
+.venv/bin/pip install -e .
 ```
+
+## Quick Start
 
 ```bash
-python3 -m pip install -e .
+./generate.sh        # Generate calibration PDF
+                     # Print duplex (100% scale, long-edge flip)
+                     # Scan both sides as front.png / back.png
+./analyze.sh         # Measure offset → saves calibration_result.json
+./verify.sh          # Generate verification PDF with compensation
+                     # Print duplex, hold to light to check alignment
 ```
 
-## Workflow
+## Full Workflow
 
-1. Generate the calibration PDF.
+### 1. Generate calibration sheet
 
 ```bash
 printer-keystone generate --paper letter --out calibration.pdf
 ```
 
-If your printer can’t print close to the edges, increase the safe inset:
+Prints a 2-page PDF with ArUco fiducial markers (IDs 10–14) and a registration target. No border is drawn — the analysis uses paper edge detection.
+
+### 2. Print and scan
+
+- Print duplex at **100% scale** (no fit-to-page), **long-edge flip**.
+- Scan both sides on a flatbed scanner. Keep full paper edges visible (disable auto-crop).
+- Save as `front.png` and `back.png`.
+
+### 3. Analyze
 
 ```bash
-printer-keystone generate --paper letter --safe-inset-mm 15 --out calibration.pdf
+printer-keystone analyze --front front.png --back back.png --paper letter --debug-dir debug
 ```
 
-2. Print it duplex (100% scale; no "fit to page").
+Outputs:
+- `back_shift_x_mm` / `back_shift_y_mm`: total front-to-back misalignment.
+- Per-side diagnostics: translation, rotation, scale, reprojection error.
+- Saves per-side compensation values to `calibration_result.json`.
 
-3. Scan the printed sheet (both sides).
+### 4. Generate verification print
 
-You can pass images (`.png/.jpg`) or PDFs (`.pdf`). If your scanner outputs a 2-page PDF, pass it twice and pick pages.
+```bash
+printer-keystone verify --paper letter
+```
 
-4. Analyze and get offsets:
+Reads `calibration_result.json` and generates `verify.pdf` with per-side marker offsets to compensate for the printer's error. Both the front and back pages are individually corrected.
+
+Print duplex and hold to light — the registration bullseye targets should overlap.
+
+### 5. Iterative refinement
+
+If the verification print still shows visible offset, scan it and refine:
 
 ```bash
 printer-keystone analyze \
-  --front front.pdf --front-page 1 \
-  --back back.pdf --back-page 1 \
-  --paper letter \
-  --debug-dir debug_out
+  --front verifyfront.png --back verifyback.png \
+  --paper letter --debug-dir debug --refine
 ```
 
-The command prints:
+The `--refine` flag adds the measured residual to the existing accumulated compensation. Then run `verify` again. Each iteration converges closer to perfect alignment.
 
-- `back_shift_x_mm` / `back_shift_y_mm`: how much to shift the *back side* to match the front (front-view coordinates).
-- Extra diagnostics: estimated rotation and scale per side.
+Repeat until the measured offset is within your target (e.g., <0.25mm).
 
-## Notes / Assumptions
+## Shell Scripts
 
-- This computes alignment relative to detected page bounds. If the scan does not include physical paper edges, the analyzer may treat the scan image bounds as the page.
-- For best results:
-  - Scan with auto-crop off if possible.
-  - Use a flatbed or a consistent ADF; avoid skew.
-  - Ensure the full page edges are visible in the scan.
+| Script | Purpose |
+|--------|---------|
+| `generate.sh` | Generate calibration PDF (letter paper) |
+| `analyze.sh` | Analyze front.png/back.png scans (pass `--front`/`--back` to override) |
+| `verify.sh` | Generate verification PDF from calibration_result.json |
 
-## Printable Margins (Important)
-
-Many printers cannot print close to the paper edge, which can cause the border/fiducials to be clipped.
-
-If the border does not print, regenerate with a larger inset:
-
+All scripts accept extra flags via `"$@"`, e.g.:
 ```bash
-printer-keystone generate --paper letter --safe-inset-mm 15 --out calibration.pdf
+./analyze.sh --front verifyfront.png --back verifyback.png --refine
 ```
 
-## Debug Output And Diagnostics
+## Tips for Accuracy
 
-If the tool reports a crazy `scale` (far from 1.0) or large `rot_deg`, enable debug output:
+- **No border detection**: Analysis uses paper edge detection, not the printed border. This gives better results (scale ~1.002, reproj_err <0.1mm).
+- **Scanner DPI**: Higher DPI improves sub-pixel marker detection. 600+ DPI recommended for <0.25mm accuracy.
+- **Consistent scanner placement**: Always place the sheet flush against the same corner.
+- **Iterative refinement**: One round of `--refine` typically halves the remaining error.
+
+## Debug Output
 
 ```bash
-printer-keystone analyze ... --debug-dir debug_out
+printer-keystone analyze ... --debug-dir debug
 ```
 
 Check:
-- `debug_out/*_paper_corners.png`: red dots must land on the actual page corners (not on a marker/border).
-- `debug_out/*_border_corners.png`: if present, shows detected inset border corners used as a fallback reference.
-- `debug_out/*_markers.png`: should show detected IDs `10,11,12,13,14`.
+- `debug/*_paper_corners.png`: red dots on detected page corners.
+- `debug/*_markers.png`: detected marker IDs and centers.
 
-What “good” typically looks like:
-- `scale` is close to `1.0`
-- `rot_deg` is close to `0`
-- `markers` includes all five IDs `[10, 11, 12, 13, 14]` on both sides
-
-If you see `scale` around `10+` or `rot_deg` around `5+`, the analyzer probably used the wrong contour as the “page” (often a marker or the inset border). Re-scan with full page edges visible and good contrast around the paper, or increase `--safe-inset-mm` so the border prints.
+Healthy diagnostics:
+- `scale` close to `1.0` (within 0.5%)
+- `rot_deg` close to `0` (within 0.2°)
+- `reproj_err` < 0.2mm
+- All 5 markers `[10, 11, 12, 13, 14]` detected
