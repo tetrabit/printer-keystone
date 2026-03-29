@@ -17,3 +17,13 @@ debug_out/
 *.tif
 *.tiff
 *.pdf
+
+# Environment / secret files – never commit these
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.cert
+*.crt
